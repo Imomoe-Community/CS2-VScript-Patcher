@@ -45,7 +45,7 @@ std::vector<size_t> findHexArray(std::vector<uint8_t>& buffer, const std::vector
 		bool found = true;
 
 		for (size_t j = 0; j < arraySize; ++j) {
-			if (buffer[i + j] != hexArray[j] && hexArray[j] != 0x2a) {
+			if (buffer[i + j] != hexArray[j] && hexArray[j] != 0x2A) {
 				found = false;
 				break;
 			}
@@ -53,10 +53,7 @@ std::vector<size_t> findHexArray(std::vector<uint8_t>& buffer, const std::vector
 
 		if (found)
 		{
-			for (size_t j = 0; j < arraySize; ++j) {
-				buffer[i + j] = hexArray[j];
-			}
-
+			std::cout << "[INFO] " << "Found position at buffer index: " << i << std::endl;
 			positions.push_back(i);
 		}
 	}
@@ -110,9 +107,12 @@ void PatchFile(std::string fileName, std::vector<uint8_t> originalArray, std::ve
 
 	for (size_t pos : positions)
 	{
-		for (size_t i = 0; i < originalArray.size(); ++i)
+		for (size_t i = 0; i < replacedArray.size(); ++i)
 		{
-			buffer[pos + i] = replacedArray[i];
+			if (replacedArray[i] != 0x2A)
+			{
+				buffer[pos + i] = replacedArray[i];
+			}
 		}
 	}
 
@@ -128,17 +128,17 @@ int main()
 {
 	std::string filePath = "./bin/win64/vscript.dll";
 
-	SetConsoleTitleA("���Ҿ�У VScript Patcher");
+	SetConsoleTitleA("黄埔军校 VScript Patcher");
 
 	std::cout << "[VScript Patcher]" << std::endl;
 	std::cout << "Created by Kroytz (https://github.com/Kroytz)" << std::endl;
-	std::cout << "Code mainly from RealSkid (https://www.unknowncheats.me/forum/members/3339879.html)" << std::endl;
 	std::cout << "Method from Source2ZE (https://github.com/Source2ZE/CS2Fixes)" << std::endl;
+	std::cout << "Code mainly from RealSkid (https://www.unknowncheats.me/forum/members/3339879.html)" << std::endl;
 	std::cout << "Place this executable in your <game> folder" << std::endl;
 	std::cout << "  " << std::endl;
 	std::cout << "  " << std::endl;
 
-	PatchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 });
+	PatchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02 });
 	std::cout << "  " << std::endl;
 	std::cout << "  " << std::endl;
 
