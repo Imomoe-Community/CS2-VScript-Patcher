@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <vector>
 #include <cstdint>
+#include <filesystem>
 
 bool readFile(const std::string& filename, std::vector<uint8_t>& buffer)
 {
@@ -124,6 +125,48 @@ void PatchFile(std::string fileName, std::vector<uint8_t> originalArray, std::ve
 	std::cout << "[SUCCESS] " << fileName << " has been patched." << std::endl;
 }
 
+static std::string SelectPEFile()
+{
+	TCHAR szBuffer[MAX_PATH] = { 0 };
+	OPENFILENAME file = { 0 };
+
+	ZeroMemory(&file, sizeof(file));
+
+	file.hwndOwner = NULL;
+	file.lStructSize = sizeof(file);
+	file.lpstrFilter = L"vscript.dll(vscript.dll)\0vscript.dll\0所有文件(*.*)\0*.*\0\0";
+	file.lpstrInitialDir = L"";
+	file.lpstrFile = szBuffer;
+	file.nMaxFile = sizeof(szBuffer) / sizeof(*szBuffer);
+	file.nFilterIndex = 0;
+	file.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+	if (GetOpenFileName(&file))
+	{
+		int size = WideCharToMultiByte(CP_ACP, 0, file.lpstrFile, -1, NULL, 0, NULL, NULL);
+		if (size == 0)
+		{
+			return std::string();
+		}
+		std::string result(size - 1, 0);
+		WideCharToMultiByte(CP_ACP, 0, file.lpstrFile, -1, &result[0], size, NULL, NULL);
+		return result;
+	}
+	else
+	{
+		return std::string();
+	}
+}
+
+static void Pause()
+{
+	std::cout << "Press any key to continue..." << std::flush;
+	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+	FlushConsoleInputBuffer(h);
+	WaitForSingleObject(h, INFINITE);
+	FlushConsoleInputBuffer(h);
+}
+
 int main()
 {
 	std::string filePath = "./bin/win64/vscript.dll";
@@ -134,15 +177,40 @@ int main()
 	std::cout << "Created by Kroytz (https://github.com/Kroytz)" << std::endl;
 	std::cout << "Method from Source2ZE (https://github.com/Source2ZE/CS2Fixes)" << std::endl;
 	std::cout << "Code mainly from RealSkid (https://www.unknowncheats.me/forum/members/3339879.html)" << std::endl;
-	std::cout << "Place this executable in your <game> folder" << std::endl;
+	//std::cout << "Place this executable in your <game> folder" << std::endl;
 	std::cout << "  " << std::endl;
 	std::cout << "  " << std::endl;
 
-	PatchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02 });
+	//PatchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02 });
+	
+	try
+	{
+		if (!std::filesystem::exists(filePath))
+		{
+			filePath = SelectPEFile();
+		}
+		if (std::filesystem::exists(filePath))
+		{
+			std::filesystem::copy(filePath, filePath + ".bak");
+
+			PatchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02 });
+		}
+
+	}
+	catch (const std::exception & e)
+	{
+		std::cerr << "An error occurred: " << e.what() << std::endl;
+
+		Pause();
+
+		return 1;
+	}
+
 	std::cout << "  " << std::endl;
 	std::cout << "  " << std::endl;
 
-	system("pause");
+	//system("pause");
+	Pause();
 
 	return 0;
 }
