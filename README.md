@@ -7,6 +7,7 @@ One-click tool to enable VScript function for mappers who can't use CS2Fixes etc
 ## Tutorial
 
 Place this into your game folder (or where u want) then run it.
+
 e.g. G:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive\game
 
 ## Credits
