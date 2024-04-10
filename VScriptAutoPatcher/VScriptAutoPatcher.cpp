@@ -195,6 +195,11 @@ int main()
 
 			PatchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02 });
 		}
+		else
+		{
+			std::cerr << "File doesn't exist" << std::endl;
+			return 2;
+		}
 
 	}
 	catch (const std::exception & e)
