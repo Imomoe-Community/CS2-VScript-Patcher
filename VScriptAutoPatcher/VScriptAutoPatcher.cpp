@@ -167,9 +167,9 @@ static void Pause()
 	FlushConsoleInputBuffer(h);
 }
 
-int main()
+int main(int argc, const char * const * argv)
 {
-	std::string filePath = "./bin/win64/vscript.dll";
+	std::string filePath;
 
 	SetConsoleTitleA("黄埔军校 VScript Patcher");
 
@@ -185,6 +185,20 @@ int main()
 	
 	try
 	{
+		if (argc > 1)
+		{
+			filePath = argv[1];
+			if (!std::filesystem::exists(filePath))
+			{
+				std::cerr << "Specified file path does not exist." << std::endl;
+				return 2;
+			}
+		}
+		else
+		{
+			filePath = "./bin/win64/vscript.dll";
+		}
+
 		if (!std::filesystem::exists(filePath))
 		{
 			filePath = SelectPEFile();
