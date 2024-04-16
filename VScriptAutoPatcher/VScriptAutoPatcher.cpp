@@ -1,129 +1,12 @@
 #include <iostream>
-#include <Windows.h>
 #include <vector>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 
-bool readFile(const std::string& filename, std::vector<uint8_t>& buffer)
-{
-	HANDLE fileHandle = CreateFileA(
-		filename.c_str(),
-		GENERIC_READ,
-		FILE_SHARE_READ,
-		NULL,
-		OPEN_EXISTING,
-		FILE_ATTRIBUTE_NORMAL,
-		NULL
-	);
-
-	if (fileHandle == INVALID_HANDLE_VALUE)
-	{
-		std::cerr << "[ERROR] " << "Failed to create handle to: " << filename << std::endl;
-		//std::cout << "[REMINDER] " << "Make sure the executable is in same folder with: " << filename << std::endl;
-		return false;
-	}
-
-	DWORD fileSize = GetFileSize(fileHandle, NULL);
-	buffer.resize(fileSize);
-
-	DWORD bytesRead = 0;
-	ReadFile(fileHandle, buffer.data(), fileSize, &bytesRead, NULL);
-
-	CloseHandle(fileHandle);
-
-	return true;
-}
-
-std::vector<size_t> findHexArray(std::vector<uint8_t>& buffer, const std::vector<uint8_t>& hexArray)
-{
-	std::vector<size_t> positions;
-
-	size_t bufferSize = buffer.size();
-	size_t arraySize = hexArray.size();
-
-	for (size_t i = 0; i <= bufferSize - arraySize; ++i)
-	{
-		bool found = true;
-
-		for (size_t j = 0; j < arraySize; ++j) {
-			if (buffer[i + j] != hexArray[j] && hexArray[j] != 0x2A) {
-				found = false;
-				break;
-			}
-		}
-
-		if (found)
-		{
-			std::cout << "[INFO] " << "Found position at buffer index: " << i << std::endl;
-			positions.push_back(i);
-		}
-	}
-
-	return positions;
-}
-
-bool writeFile(const std::string& filename, const std::vector<uint8_t>& buffer)
-{
-	HANDLE fileHandle = CreateFileA(
-		filename.c_str(),
-		GENERIC_WRITE,
-		0,
-		NULL,
-		CREATE_ALWAYS,
-		FILE_ATTRIBUTE_NORMAL,
-		NULL
-	);
-
-	if (fileHandle == INVALID_HANDLE_VALUE)
-	{
-		std::cerr << "[ERROR] " << "Failed to create handle to: " << filename << std::endl;
-		//std::cout << "[REMINDER] " << "Make sure the executable is in same folder with: " << filename << std::endl;
-
-		return false;
-	}
-
-	DWORD bytesWritten = 0;
-	WriteFile(fileHandle, buffer.data(), buffer.size(), &bytesWritten, NULL);
-
-	CloseHandle(fileHandle);
-
-	return (bytesWritten == buffer.size());
-}
-
-void PatchFile(std::string fileName, std::vector<uint8_t> originalArray, std::vector<uint8_t> replacedArray)
-{
-	std::vector<uint8_t> buffer;
-	if (!readFile(fileName, buffer))
-	{
-		return;
-	}
-
-	std::vector<size_t> positions = findHexArray(buffer, originalArray);
-
-	if (positions.empty())
-	{
-		std::cout << "[ERROR] " << fileName << " is already patched" << std::endl;
-		return;
-	}
-
-	for (size_t pos : positions)
-	{
-		for (size_t i = 0; i < replacedArray.size(); ++i)
-		{
-			if (replacedArray[i] != 0x2A)
-			{
-				buffer[pos + i] = replacedArray[i];
-			}
-		}
-	}
-
-	if (!writeFile(fileName, buffer))
-	{
-		return;
-	}
-
-	std::cout << "[SUCCESS] " << fileName << " has been patched." << std::endl;
-}
+#ifdef _WIN32
+#include <Windows.h>
+#include <conio.h>
 
 static std::string SelectPEFile()
 {
@@ -161,10 +44,113 @@ static std::string SelectPEFile()
 static void Pause()
 {
 	std::cout << "Press any key to continue..." << std::flush;
-	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
-	FlushConsoleInputBuffer(h);
-	WaitForSingleObject(h, INFINITE);
-	FlushConsoleInputBuffer(h);
+	(void)_getch();
+}
+
+#else
+
+static void Pause()
+{
+
+}
+
+#endif // _WIN32
+
+static bool readFile(const std::string & fileName, std::vector<uint8_t> & buffer)
+{
+	std::ifstream file(fileName, std::ios::binary);
+
+	if (!file.is_open())
+	{
+		std::cerr << "[ERROR] " << "Failed to open file: " << fileName << std::endl;
+		return false;
+	}
+
+	file.seekg(0, std::ios::end);
+	std::streamsize fileSize = file.tellg();
+	file.seekg(0, std::ios::beg);
+
+	buffer.resize(static_cast<size_t>(fileSize));
+	file.read(reinterpret_cast<char *>(buffer.data()), fileSize);
+
+	file.close();
+	return true;
+}
+
+static std::vector<size_t> findHexArray(const std::vector<uint8_t> & buffer, const std::vector<uint8_t> & hexArray)
+{
+	std::vector<size_t> positions;
+
+	size_t bufferSize = buffer.size();
+	size_t arraySize = hexArray.size();
+
+	for (size_t i = 0; i <= bufferSize - arraySize; ++i)
+	{
+		if (std::ranges::equal(buffer.begin() + i, buffer.begin() + i + arraySize, hexArray.begin(), hexArray.end(),
+							   [](uint8_t a, uint8_t b)
+		{
+			return a == b || b == 0x2A;
+		}))
+		{
+			std::cout << "[INFO] " << "Found position at buffer index: " << i << std::endl;
+			positions.push_back(i);
+		}
+	}
+
+	return positions;
+}
+
+static bool writeFile(const std::string & fileName, const std::vector<uint8_t> & buffer)
+{
+	std::ofstream file(fileName, std::ios::binary);
+
+	if (!file.is_open())
+	{
+		std::cerr << "[ERROR] " << "Failed to open file: " << fileName << std::endl;
+		return false;
+	}
+
+	file.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
+
+	file.close();
+
+	return true;
+}
+
+static void patchFile(const std::string & fileName, const std::vector<uint8_t> & originalArray, const std::vector<uint8_t> & replacedArray)
+{
+	std::vector<uint8_t> buffer;
+
+	if (!readFile(fileName, buffer))
+	{
+		return;
+	}
+
+	std::vector<size_t> positions = findHexArray(buffer, originalArray);
+
+	if (positions.empty())
+	{
+		std::cerr << "[ERROR] " << fileName << " is already patched" << std::endl;
+		return;
+	}
+
+	if (std::filesystem::exists(fileName + ".bak"))
+	{
+		std::filesystem::remove(fileName + ".bak");
+	}
+	std::filesystem::copy(fileName, fileName + ".bak");
+
+	for (size_t pos : positions)
+	{
+		std::ranges::copy(replacedArray.begin(), replacedArray.end(), buffer.begin() + pos);
+	}
+
+	if (!writeFile(fileName, buffer))
+	{
+		return;
+	}
+
+	std::cout << "[SUCCESS] " << fileName << " has been patched." << std::endl;
 }
 
 int main(int argc, const char * const * argv)
@@ -198,23 +184,21 @@ int main(int argc, const char * const * argv)
 		{
 			filePath = "./bin/win64/vscript.dll";
 		}
-
+#ifdef _WIN32
 		if (!std::filesystem::exists(filePath))
 		{
 			filePath = SelectPEFile();
 		}
+#endif // _WIN32
 		if (std::filesystem::exists(filePath))
 		{
-			std::filesystem::copy(filePath, filePath + ".bak");
-
-			PatchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02 });
+			patchFile(filePath, { 0xBE, 0x01, 0x2A, 0x2A, 0x2A, 0x2B, 0xD6, 0x74, 0x2A, 0x3B, 0xD6 }, { 0xBE, 0x02 });
 		}
 		else
 		{
 			std::cerr << "File doesn't exist" << std::endl;
 			return 2;
 		}
-
 	}
 	catch (const std::exception & e)
 	{
